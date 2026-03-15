@@ -1,0 +1,77 @@
+services:
+
+  postgres:
+    image: postgres:15
+    container_name: devsu-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: devsu
+      POSTGRES_PASSWORD: devsu123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db-init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devsu"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: devsu-rabbitmq
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: devsu
+      RABBITMQ_DEFAULT_PASS: devsu123
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  clientes-service:
+    build: ./personas
+    container_name: clientes-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/clientes_db
+      SPRING_DATASOURCE_USERNAME: devsu
+      SPRING_DATASOURCE_PASSWORD: devsu123
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: devsu
+      SPRING_RABBITMQ_PASSWORD: devsu123
+    ports:
+      - "8081:8081"
+
+  cuentas-service:
+    build: ./movimientos-services
+    container_name: cuentas-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/cuentas_db
+      SPRING_DATASOURCE_USERNAME: devsu
+      SPRING_DATASOURCE_PASSWORD: devsu123
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_USERNAME: devsu
+      SPRING_RABBITMQ_PASSWORD: devsu123
+    ports:
+      - "8082:8082"
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
